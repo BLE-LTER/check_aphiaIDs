@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check WoRMS Status</title>
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.css">
+<style>
+    /* Basic styling for the form */
+    body {
+        font-family: Arial, sans-serif;
+    }
+    form {
+        margin: 20px;
+    }
+    label {
+        display: block;
+        margin-bottom: 5px;
+    }
+    input[type="submit"] {
+        padding: 10px 20px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #4CAF50;
+        color: white;
+    }
+</style>
+</head>
+<body>
+
+<form id="wormsForm">
+    <label for="aphiaIDs">Enter AphiaIDs (one per line):</label>
+    <textarea id="aphiaIDs" rows="5">152282
+175043</textarea>
+    <br>
+    <input type="submit" value="Check WoRMS">
+</form>
+
+<div id="result"></div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.js"></script>
+<script>
+document.getElementById('wormsForm').addEventListener('submit', function(event) {
+    event.preventDefault(); // prevent form submission
+    
+    // Get the input value
+    var aphiaIDs = document.getElementById('aphiaIDs').value.split('\n').map(id => id.trim()).filter(id => id !== '');
+
+    // Check each AphiaID in WoRMS
+    var resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = ''; // clear previous results
+    if (aphiaIDs.length === 0) {
+        resultDiv.innerHTML = '<p>No AphiaIDs provided.</p>';
+        return;
+    }
+    
+    // Display a loading message
+    resultDiv.innerHTML = '<p>Loading...</p>';
+
+    // Function to fetch data for a single AphiaID
+    function fetchData(aphiaID) {
+        return fetch('https://www.marinespecies.org/rest/AphiaRecordByAphiaID/' + aphiaID)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error fetching data for AphiaID:', aphiaID, 'Error:', data.error);
+                    return {
+                        status: 'n/a',
+                        aphiaID: aphiaID,
+                        name: 'n/a',
+                        acceptedName: 'n/a',
+                        acceptedID: 'n/a'
+                    };
+                } else {
+                    return {
+                        status: data.status,
+                        aphiaID: '<a href="https://www.marinespecies.org/aphia.php?p=taxdetails&id=' + data.AphiaID + '" target="_blank">' + data.AphiaID + '</a>',
+                        name: data.scientificname,
+                        acceptedName: data.valid_name,
+                        acceptedID: '<a href="https://www.marinespecies.org/aphia.php?p=taxdetails&id=' + data.valid_AphiaID + '" target="_blank">' + data.valid_AphiaID + '</a>'
+                    };
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching data for AphiaID:', aphiaID, 'Error:', error);
+                return {
+                    status: 'n/a',
+                    aphiaID: aphiaID,
+                    name: 'n/a',
+                    acceptedName: 'n/a',
+                    acceptedID: 'n/a'
+                };
+            });
+    }
+
+    // Fetch data for each AphiaID and display results
+    Promise.all(aphiaIDs.map(fetchData))
+        .then(results => {
+            // Generate HTML table with results
+            var html = '<table id="resultTable"><thead><tr><th>Status</th><th>AphiaID</th><th>Name</th><th>Accepted Name</th><th>Accepted ID</th></tr></thead><tbody>';
+            results.forEach(result => {
+                html += '<tr>';
+                html += '<td>' + result.status + '</td>';
+                html += '<td>' + result.aphiaID + '</td>';
+                html += '<td>' + result.name + '</td>';
+                html += '<td>' + result.acceptedName + '</td>';
+                html += '<td>' + result.acceptedID + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            resultDiv.innerHTML = html;
+
+            // Initialize DataTable
+            $('#resultTable').DataTable({
+                paging: false // Disable pagination
+            });
+        });
+});
+</script>
+
+</body>
+</html>
